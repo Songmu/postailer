@@ -15,6 +15,7 @@ type readSeekCloser interface {
 	io.Seeker
 }
 
+// Postailer is main struct of postailer package
 type Postailer struct {
 	filePath string
 	posFile  string
@@ -29,6 +30,7 @@ type position struct {
 	Pos   int64 `json:"pos"`
 }
 
+// Open the file with posfile
 func Open(filepath, posfile string) (*Postailer, error) {
 	pt := &Postailer{
 		filePath: filepath,
@@ -96,6 +98,7 @@ func (pt *Postailer) open() error {
 	return nil
 }
 
+// Read for io.Reader interface
 func (pt *Postailer) Read(p []byte) (int, error) {
 	n, err := pt.file.Read(p)
 	pt.pos.Pos += int64(n)
@@ -127,6 +130,7 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 	return n + nn, err
 }
 
+// Seek for io.Seeker interface
 func (pt *Postailer) Seek(offset int64, whence int) (int64, error) {
 	ret, err := pt.file.Seek(offset, whence)
 	if err != nil {
@@ -135,6 +139,7 @@ func (pt *Postailer) Seek(offset int64, whence int) (int64, error) {
 	return ret, err
 }
 
+// Close for io.Closer interface
 func (pt *Postailer) Close() error {
 	defer pt.file.Close()
 	return savePos(pt.posFile, pt.pos)
