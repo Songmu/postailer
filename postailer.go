@@ -37,10 +37,10 @@ func Open(filepath, posfile string) (*Postailer, error) {
 }
 
 func loadPos(fname string) (*position, error) {
-	pos = &position{}
+	pos := &position{}
 	_, err := os.Stat(fname)
 	if err == nil { // posfile exists
-		b, err := ioutil.ReadAll(fname)
+		b, err := ioutil.ReadFile(fname)
 		if err == nil {
 			err := json.Unmarshal(b, pos)
 			return pos, err
@@ -57,7 +57,7 @@ func (pt *Postailer) Open() error {
 	if err != nil {
 		return err
 	}
-	inode = detectInode(fi)
+	inode := detectInode(fi)
 	if pt.pos.Inode > 0 && inode != pt.pos.Inode {
 		if oldFile, err := findFileByInode(pt.pos.Inode, filepath.Dir(pt.FilePath)); err != nil {
 			oldf, err := os.Open(oldFile)
@@ -66,7 +66,7 @@ func (pt *Postailer) Open() error {
 			}
 			oldfi, _ := oldf.Stat()
 			if oldfi.Size() > pt.pos.Pos {
-				oldf.Seek(po.pos.Pos, 0)
+				oldf.Seek(pt.pos.Pos, 0)
 				pt.oldfile = true
 				pt.rcloser = oldf
 				return nil
@@ -81,6 +81,8 @@ func (pt *Postailer) Open() error {
 	}
 	if pt.pos.Pos > fi.Size() {
 		f.Seek(pt.pos.Pos, 0)
+	} else {
+		pt.pos.Pos = 0
 	}
 	pt.rcloser = f
 	return nil
@@ -88,7 +90,7 @@ func (pt *Postailer) Open() error {
 
 func (pt *Postailer) Read(p []byte) (int, error) {
 	n, err := pt.rcloser.Read(p)
-	pt.pos.Pos += n
+	pt.pos.Pos += int64(n)
 	if err == nil || err != io.EOF || !pt.oldfile {
 		return n, err
 	}
@@ -113,18 +115,18 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 	for i := 0; i < nn; i++ {
 		p[n+i] = buf[i]
 	}
-	pt.pos.Pos = nn
+	pt.pos.Pos = int64(nn)
 	return n + nn, err
 }
 
 func (pt *Postailer) Close() error {
 	defer pt.rcloser.Close()
-	return pt.savePos()
+	return savePos(pt.PosFile, pt.pos)
 }
 
-func (pt *Postailer) savePos() error {
-	b, _ := json.Marshal(pt.pos)
-	return writeFileAtomically(pt.PosFile, b)
+func savePos(posfile string, pos *position) error {
+	b, _ := json.Marshal(pos)
+	return writeFileAtomically(posfile, b)
 }
 
 // XXX may be dirty, should be return error?
@@ -140,7 +142,7 @@ func findFileByInode(inode uint, dir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, fi := range ifs {
+	for _, fi := range fis {
 		if detectInode(fi) == inode {
 			return filepath.Join(dir, fi.Name()), nil
 		}
