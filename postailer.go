@@ -16,7 +16,7 @@ type Postailer struct {
 
 	pos     *position
 	oldfile bool
-	rcloser io.ReadCloser
+	file    *os.File
 }
 
 type position struct {
@@ -67,9 +67,9 @@ func (pt *Postailer) open() error {
 			}
 			oldfi, _ := oldf.Stat()
 			if oldfi.Size() > pt.pos.Pos {
-				oldf.Seek(pt.pos.Pos, 0)
+				oldf.Seek(pt.pos.Pos, io.SeekStart)
 				pt.oldfile = true
-				pt.rcloser = oldf
+				pt.file = oldf
 				return nil
 			}
 		} else if err != errFileNotFoundByInode {
@@ -83,21 +83,21 @@ func (pt *Postailer) open() error {
 		return err
 	}
 	if pt.pos.Pos < fi.Size() {
-		f.Seek(pt.pos.Pos, 0)
+		f.Seek(pt.pos.Pos, io.SeekStart)
 	} else {
 		pt.pos.Pos = 0
 	}
-	pt.rcloser = f
+	pt.file = f
 	return nil
 }
 
 func (pt *Postailer) Read(p []byte) (int, error) {
-	n, err := pt.rcloser.Read(p)
+	n, err := pt.file.Read(p)
 	pt.pos.Pos += int64(n)
 	if !(pt.oldfile && ((err == nil && n < len(p)) || (err == io.EOF))) {
 		return n, err
 	}
-	pt.rcloser.Close()
+	pt.file.Close()
 	f, err := os.Open(pt.filePath)
 	if err != nil {
 		return n, err
@@ -108,13 +108,13 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 	}
 	pt.pos = &position{Inode: detectInode(fi)}
 	pt.oldfile = false
-	pt.rcloser = f
+	pt.file = f
 
 	if n == len(p) {
 		return n, err
 	}
 	buf := make([]byte, len(p)-n)
-	nn, err := pt.rcloser.Read(buf)
+	nn, err := pt.file.Read(buf)
 	for i := 0; i < nn; i++ {
 		p[n+i] = buf[i]
 	}
@@ -122,8 +122,16 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 	return n + nn, err
 }
 
+func (pt *Postailer) Seek(offset int64, whence int) (int64, error) {
+	ret, err := pt.file.Seek(offset, whence)
+	if err != nil {
+		pt.pos.Pos = offset
+	}
+	return ret, err
+}
+
 func (pt *Postailer) Close() error {
-	defer pt.rcloser.Close()
+	defer pt.file.Close()
 	return savePos(pt.posFile, pt.pos)
 }
 

@@ -9,6 +9,13 @@ import (
 	"testing"
 )
 
+func init() {
+	var (
+		_ io.ReadCloser = &Postailer{}
+		_ io.Seeker     = &Postailer{}
+	)
+}
+
 func fileAndPos(dir string) (string, string) {
 	fname := filepath.Join(dir, "log.log")
 	posfile := fname + ".json"
