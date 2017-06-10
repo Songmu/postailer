@@ -42,15 +42,16 @@ func loadPos(fname string) (*position, error) {
 	if err == nil { // posfile exists
 		b, err := ioutil.ReadFile(fname)
 		if err == nil {
-			err := json.Unmarshal(b, pos)
-			return pos, err
+			err = json.Unmarshal(b, pos)
 		}
+		return pos, err
 	}
 	return pos, nil
 }
 
+var errFileNotFoundByInode = fmt.Errorf("old file not found")
+
 func (pt *Postailer) open() error {
-	// XXX error handling
 	pt.pos, _ = loadPos(pt.posFile)
 	fi, err := os.Stat(pt.filePath)
 	// XXX may be missing the file for a moment while rotating...
@@ -71,8 +72,9 @@ func (pt *Postailer) open() error {
 				pt.rcloser = oldf
 				return nil
 			}
+		} else if err != errFileNotFoundByInode {
+			return err
 		}
-		// XXX error handling?
 		pt.pos.Pos = 0
 	}
 	pt.pos.Inode = inode
@@ -130,7 +132,6 @@ func savePos(posfile string, pos *position) error {
 	return writeFileAtomically(posfile, b)
 }
 
-// XXX may be dirty, should be return error?
 func detectInode(fi os.FileInfo) uint {
 	if stat, ok := fi.Sys().(*syscall.Stat_t); ok {
 		return uint(stat.Ino)
@@ -148,8 +149,7 @@ func findFileByInode(inode uint, dir string) (string, error) {
 			return filepath.Join(dir, fi.Name()), nil
 		}
 	}
-	// XXX rough error
-	return "", fmt.Errorf("file not found")
+	return "", errFileNotFoundByInode
 }
 
 func writeFileAtomically(f string, contents []byte) error {
