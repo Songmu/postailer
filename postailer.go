@@ -11,8 +11,8 @@ import (
 )
 
 type Postailer struct {
-	FilePath string
-	PosFile  string
+	filePath string
+	posFile  string
 
 	pos     *position
 	oldfile bool
@@ -26,10 +26,10 @@ type position struct {
 
 func Open(filepath, posfile string) (*Postailer, error) {
 	pt := &Postailer{
-		FilePath: filepath,
-		PosFile:  posfile,
+		filePath: filepath,
+		posFile:  posfile,
 	}
-	err := pt.Open()
+	err := pt.open()
 	if err != nil {
 		return nil, err
 	}
@@ -49,17 +49,17 @@ func loadPos(fname string) (*position, error) {
 	return pos, nil
 }
 
-func (pt *Postailer) Open() error {
+func (pt *Postailer) open() error {
 	// XXX error handling
-	pt.pos, _ = loadPos(pt.PosFile)
-	fi, err := os.Stat(pt.FilePath)
+	pt.pos, _ = loadPos(pt.posFile)
+	fi, err := os.Stat(pt.filePath)
 	// XXX may be missing the file for a moment while rotating...
 	if err != nil {
 		return err
 	}
 	inode := detectInode(fi)
 	if pt.pos.Inode > 0 && inode != pt.pos.Inode {
-		if oldFile, err := findFileByInode(pt.pos.Inode, filepath.Dir(pt.FilePath)); err == nil {
+		if oldFile, err := findFileByInode(pt.pos.Inode, filepath.Dir(pt.filePath)); err == nil {
 			oldf, err := os.Open(oldFile)
 			if err != nil {
 				return err
@@ -76,7 +76,7 @@ func (pt *Postailer) Open() error {
 		pt.pos.Pos = 0
 	}
 	pt.pos.Inode = inode
-	f, err := os.Open(pt.FilePath)
+	f, err := os.Open(pt.filePath)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 		return n, err
 	}
 	pt.rcloser.Close()
-	f, err := os.Open(pt.FilePath)
+	f, err := os.Open(pt.filePath)
 	if err != nil {
 		return n, err
 	}
@@ -122,7 +122,7 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 
 func (pt *Postailer) Close() error {
 	defer pt.rcloser.Close()
-	return savePos(pt.PosFile, pt.pos)
+	return savePos(pt.posFile, pt.pos)
 }
 
 func savePos(posfile string, pos *position) error {
