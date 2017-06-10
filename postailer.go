@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -37,41 +36,50 @@ func Open(filepath, posfile string) (*Postailer, error) {
 	return pt, nil
 }
 
-func (pt *Postailer) Open() error {
-	pt.pos = &position{}
-	_, err := os.Stat(pt.PosFile)
+func loadPos(fname string) (*position, error) {
+	pos = &position{}
+	_, err := os.Stat(fname)
 	if err == nil { // posfile exists
-		b, err := ioutil.ReadAll(pt.PosFile)
+		b, err := ioutil.ReadAll(fname)
 		if err == nil {
-			json.Unmarshal(b, pt.pos)
-			// XXX err handling?
+			err := json.Unmarshal(b, pos)
+			return pos, err
 		}
 	}
+	return pos, nil
+}
 
-	if pt.pos.Inode > 0 {
-		fi, err := os.Stat(pt.FilePath)
-		if err != nil {
-			return err
-		}
-		if detectInode(fi) != pt.pos.Inode && fi.Size() < pt.pos.Pos {
-			if oldFile, err := findFileByInode(pt.pos.Inode, filepath.Dir(pt.FilePath)); err != nil {
-				f, err := os.Open(oldFile)
-				if err != nil {
-					return err
-				}
-				f.Seek(po.pos.Pos, 0)
+func (pt *Postailer) Open() error {
+	// XXX error handling
+	pt.pos, _ = loadPos(pt.PosFile)
+	fi, err := os.Stat(pt.FilePath)
+	// XXX may be missing the file for a moment while rotating...
+	if err != nil {
+		return err
+	}
+	inode = detectInode(fi)
+	if pt.pos.Inode > 0 && inode != pt.pos.Inode {
+		if oldFile, err := findFileByInode(pt.pos.Inode, filepath.Dir(pt.FilePath)); err != nil {
+			oldf, err := os.Open(oldFile)
+			if err != nil {
+				return err
+			}
+			oldfi, _ := oldf.Stat()
+			if oldfi.Size() > pt.pos.Pos {
+				oldf.Seek(po.pos.Pos, 0)
 				pt.oldfile = true
-				pt.rcloser = f
+				pt.rcloser = oldf
 				return nil
 			}
-			// XXX error handling?
 		}
+		// XXX error handling?
 	}
+	pt.pos.Inode = inode
 	f, err := os.Open(pt.FilePath)
 	if err != nil {
 		return err
 	}
-	if pt.pos.Pos > 0 {
+	if pt.pos.Pos > fi.Size() {
 		f.Seek(pt.pos.Pos, 0)
 	}
 	pt.rcloser = f
@@ -111,6 +119,10 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 
 func (pt *Postailer) Close() error {
 	defer pt.rcloser.Close()
+	return pt.savePos()
+}
+
+func (pt *Postailer) savePos() error {
 	b, _ := json.Marshal(pt.pos)
 	return writeFileAtomically(pt.PosFile, b)
 }
