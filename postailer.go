@@ -59,7 +59,7 @@ func (pt *Postailer) Open() error {
 	}
 	inode := detectInode(fi)
 	if pt.pos.Inode > 0 && inode != pt.pos.Inode {
-		if oldFile, err := findFileByInode(pt.pos.Inode, filepath.Dir(pt.FilePath)); err != nil {
+		if oldFile, err := findFileByInode(pt.pos.Inode, filepath.Dir(pt.FilePath)); err == nil {
 			oldf, err := os.Open(oldFile)
 			if err != nil {
 				return err
@@ -73,13 +73,14 @@ func (pt *Postailer) Open() error {
 			}
 		}
 		// XXX error handling?
+		pt.pos.Pos = 0
 	}
 	pt.pos.Inode = inode
 	f, err := os.Open(pt.FilePath)
 	if err != nil {
 		return err
 	}
-	if pt.pos.Pos > fi.Size() {
+	if pt.pos.Pos < fi.Size() {
 		f.Seek(pt.pos.Pos, 0)
 	} else {
 		pt.pos.Pos = 0
@@ -91,7 +92,7 @@ func (pt *Postailer) Open() error {
 func (pt *Postailer) Read(p []byte) (int, error) {
 	n, err := pt.rcloser.Read(p)
 	pt.pos.Pos += int64(n)
-	if err == nil || err != io.EOF || !pt.oldfile {
+	if !(pt.oldfile && ((err == nil && n < len(p)) || (err == io.EOF))) {
 		return n, err
 	}
 	pt.rcloser.Close()

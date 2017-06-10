@@ -1,6 +1,7 @@
 package postailer
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ var readTests = []struct {
 	NextPos int64
 }{
 	{
-		Name: "Simple",
+		Name: "New",
 		Prepare: func() (string, error) {
 			tmpd, err := ioutil.TempDir("", "")
 			if err != nil {
@@ -34,6 +35,148 @@ var readTests = []struct {
 			}
 			fname, _ := fileAndPos(tmpd)
 			ioutil.WriteFile(fname, []byte("abcdf13579"), 0644)
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
+		N1:      5,
+		Error1:  nil,
+		Output2: []byte{'1', '3', '5'},
+		N2:      3,
+		Error2:  nil,
+		NextPos: 8,
+	},
+	{
+		Name: "Simple",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, posfile := fileAndPos(tmpd)
+			ioutil.WriteFile(fname, []byte("-skip-abcdf13579"), 0644)
+			fi, _ := os.Stat(fname)
+			savePos(posfile, &position{
+				Inode: detectInode(fi),
+				Pos:   6,
+			})
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
+		N1:      5,
+		Error1:  nil,
+		Output2: []byte{'1', '3', '5'},
+		N2:      3,
+		Error2:  nil,
+		NextPos: 14,
+	},
+	{
+		Name: "EOF",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, _ := fileAndPos(tmpd)
+			ioutil.WriteFile(fname, []byte("abcd"), 0644)
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 0},
+		N1:      4,
+		Error1:  nil,
+		Output2: []byte{0, 0, 0},
+		N2:      0,
+		Error2:  io.EOF,
+		NextPos: 4,
+	},
+	{
+		Name: "Roteted",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, posfile := fileAndPos(tmpd)
+			ioutil.WriteFile(fname, []byte("-skip-abcd"), 0644)
+			fi, _ := os.Stat(fname)
+			savePos(posfile, &position{
+				Inode: detectInode(fi),
+				Pos:   6,
+			})
+			os.Rename(fname, fname+".bak")
+			ioutil.WriteFile(fname, []byte("f135999"), 0644)
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
+		N1:      5,
+		Error1:  nil,
+		Output2: []byte{'1', '3', '5'},
+		N2:      3,
+		Error2:  nil,
+		NextPos: 4,
+	},
+	{
+		Name: "Just Roteted",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, posfile := fileAndPos(tmpd)
+			ioutil.WriteFile(fname, []byte("-skip-abcdf"), 0644)
+			fi, _ := os.Stat(fname)
+			savePos(posfile, &position{
+				Inode: detectInode(fi),
+				Pos:   6,
+			})
+			os.Rename(fname, fname+".bak")
+			ioutil.WriteFile(fname, []byte("135999"), 0644)
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
+		N1:      5,
+		Error1:  nil,
+		Output2: []byte{'1', '3', '5'},
+		N2:      3,
+		Error2:  nil,
+		NextPos: 3,
+	},
+	{
+		Name: "Roteted but missing",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, posfile := fileAndPos(tmpd)
+			savePos(posfile, &position{
+				Inode: ^uint(0) - 10,
+				Pos:   6,
+			})
+			ioutil.WriteFile(fname, []byte("abcdf13579"), 0644)
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
+		N1:      5,
+		Error1:  nil,
+		Output2: []byte{'1', '3', '5'},
+		N2:      3,
+		Error2:  nil,
+		NextPos: 8,
+	},
+	{
+		Name: "Same inode, but Truncated",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, posfile := fileAndPos(tmpd)
+			ioutil.WriteFile(fname, []byte("abcdf13579"), 0644)
+			fi, _ := os.Stat(fname)
+			savePos(posfile, &position{
+				Inode: detectInode(fi),
+				Pos:   10000,
+			})
 			return tmpd, nil
 		},
 		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
