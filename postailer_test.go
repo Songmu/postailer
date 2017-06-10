@@ -10,10 +10,7 @@ import (
 )
 
 func init() {
-	var (
-		_ io.ReadCloser = &Postailer{}
-		_ io.Seeker     = &Postailer{}
-	)
+	var _ readSeekCloser = &Postailer{}
 }
 
 func fileAndPos(dir string) (string, string) {

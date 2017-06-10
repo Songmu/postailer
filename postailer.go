@@ -10,13 +10,18 @@ import (
 	"syscall"
 )
 
+type readSeekCloser interface {
+	io.ReadCloser
+	io.Seeker
+}
+
 type Postailer struct {
 	filePath string
 	posFile  string
 
 	pos     *position
 	oldfile bool
-	file    *os.File
+	file    readSeekCloser
 }
 
 type position struct {
