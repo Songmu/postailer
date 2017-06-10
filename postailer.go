@@ -129,6 +129,9 @@ func (pt *Postailer) Close() error {
 
 func savePos(posfile string, pos *position) error {
 	b, _ := json.Marshal(pos)
+	if err := os.MkdirAll(filepath.Dir(posfile), 0755); err != nil {
+		return nil
+	}
 	return writeFileAtomically(posfile, b)
 }
 
