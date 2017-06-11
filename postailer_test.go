@@ -6,11 +6,16 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
 func init() {
+	// check the Postailer satisfied readSeekCloser interface
 	var _ readSeekCloser = &Postailer{}
+	if runtime.GOOS != "windows" {
+		readTests = append(readTests, readRotateTests...)
+	}
 }
 
 func fileAndPos(dir string) (string, string) {
@@ -19,7 +24,7 @@ func fileAndPos(dir string) (string, string) {
 	return fname, posfile
 }
 
-var readTests = []struct {
+type testReadTest struct {
 	Name    string
 	Prepare func() (string, error)
 	Output1 []byte
@@ -29,7 +34,9 @@ var readTests = []struct {
 	N2      int
 	Error2  error
 	NextPos int64
-}{
+}
+
+var readTests = []testReadTest{
 	{
 		Name: "New",
 		Prepare: func() (string, error) {
@@ -93,6 +100,56 @@ var readTests = []struct {
 		NextPos: 4,
 	},
 	{
+		Name: "Roteted but missing",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, posfile := fileAndPos(tmpd)
+			savePos(posfile, &position{
+				Inode: ^uint(0) - 10,
+				Pos:   6,
+			})
+			ioutil.WriteFile(fname, []byte("abcdf13579"), 0644)
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
+		N1:      5,
+		Error1:  nil,
+		Output2: []byte{'1', '3', '5'},
+		N2:      3,
+		Error2:  nil,
+		NextPos: 8,
+	},
+	{
+		Name: "Same inode, but Truncated",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, posfile := fileAndPos(tmpd)
+			ioutil.WriteFile(fname, []byte("abcdf13579"), 0644)
+			fi, _ := os.Stat(fname)
+			savePos(posfile, &position{
+				Inode: detectInode(fi),
+				Pos:   10000,
+			})
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
+		N1:      5,
+		Error1:  nil,
+		Output2: []byte{'1', '3', '5'},
+		N2:      3,
+		Error2:  nil,
+		NextPos: 8,
+	},
+}
+
+var readRotateTests = []testReadTest{
+	{
 		Name: "Roteted",
 		Prepare: func() (string, error) {
 			tmpd, err := ioutil.TempDir("", "")
@@ -143,53 +200,6 @@ var readTests = []struct {
 		N2:      3,
 		Error2:  nil,
 		NextPos: 3,
-	},
-	{
-		Name: "Roteted but missing",
-		Prepare: func() (string, error) {
-			tmpd, err := ioutil.TempDir("", "")
-			if err != nil {
-				return "", err
-			}
-			fname, posfile := fileAndPos(tmpd)
-			savePos(posfile, &position{
-				Inode: ^uint(0) - 10,
-				Pos:   6,
-			})
-			ioutil.WriteFile(fname, []byte("abcdf13579"), 0644)
-			return tmpd, nil
-		},
-		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
-		N1:      5,
-		Error1:  nil,
-		Output2: []byte{'1', '3', '5'},
-		N2:      3,
-		Error2:  nil,
-		NextPos: 8,
-	},
-	{
-		Name: "Same inode, but Truncated",
-		Prepare: func() (string, error) {
-			tmpd, err := ioutil.TempDir("", "")
-			if err != nil {
-				return "", err
-			}
-			fname, posfile := fileAndPos(tmpd)
-			ioutil.WriteFile(fname, []byte("abcdf13579"), 0644)
-			fi, _ := os.Stat(fname)
-			savePos(posfile, &position{
-				Inode: detectInode(fi),
-				Pos:   10000,
-			})
-			return tmpd, nil
-		},
-		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
-		N1:      5,
-		Error1:  nil,
-		Output2: []byte{'1', '3', '5'},
-		N2:      3,
-		Error2:  nil,
-		NextPos: 8,
 	},
 }
 
