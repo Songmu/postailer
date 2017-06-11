@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"syscall"
 )
 
 type readSeekCloser interface {
@@ -151,13 +150,6 @@ func savePos(posfile string, pos *position) error {
 		return nil
 	}
 	return writeFileAtomically(posfile, b)
-}
-
-func detectInode(fi os.FileInfo) uint {
-	if stat, ok := fi.Sys().(*syscall.Stat_t); ok {
-		return uint(stat.Ino)
-	}
-	return 0
 }
 
 func findFileByInode(inode uint, dir string) (string, error) {
