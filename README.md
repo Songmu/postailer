@@ -3,7 +3,7 @@ postailer
 
 [![Build Status](https://travis-ci.org/Songmu/postailer.png?branch=master)][travis]
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)][license]
-[![GoDoc](https://godoc.org/github.com/Songmu/postailer?status.svg)](godoc)
+[![GoDoc](https://godoc.org/github.com/Songmu/postailer?status.svg)][godoc]
 
 [travis]: https://travis-ci.org/Songmu/postailer
 [coveralls]: https://coveralls.io/r/Songmu/postailer?branch=master
