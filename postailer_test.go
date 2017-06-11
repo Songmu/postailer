@@ -34,6 +34,7 @@ type testReadTest struct {
 	N2      int
 	Error2  error
 	NextPos int64
+	Hook    func(pt *Postailer) error
 }
 
 var readTests = []testReadTest{
@@ -146,6 +147,29 @@ var readTests = []testReadTest{
 		Error2:  nil,
 		NextPos: 8,
 	},
+	{
+		Name: "Seek",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, _ := fileAndPos(tmpd)
+			ioutil.WriteFile(fname, []byte("abcdf"), 0644)
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'f'},
+		N1:      5,
+		Error1:  nil,
+		Hook: func(pt *Postailer) error {
+			_, err := pt.Seek(1, io.SeekStart)
+			return err
+		},
+		Output2: []byte{'b', 'c', 'd'},
+		N2:      3,
+		Error2:  nil,
+		NextPos: 4,
+	},
 }
 
 var readRotateTests = []testReadTest{
@@ -229,6 +253,10 @@ func TestReadClose(t *testing.T) {
 			}
 			if err1 != tt.Error1 {
 				t.Errorf("%s(err1): out=%+v want %+v", tt.Name, err1, tt.Error1)
+			}
+
+			if tt.Hook != nil {
+				tt.Hook(pt)
 			}
 
 			p2 := make([]byte, 3)

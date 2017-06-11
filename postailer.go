@@ -132,8 +132,8 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 // Seek for io.Seeker interface
 func (pt *Postailer) Seek(offset int64, whence int) (int64, error) {
 	ret, err := pt.file.Seek(offset, whence)
-	if err != nil {
-		pt.pos.Pos = offset
+	if err == nil {
+		pt.pos.Pos = ret
 	}
 	return ret, err
 }
