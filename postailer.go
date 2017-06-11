@@ -122,9 +122,7 @@ func (pt *Postailer) Read(p []byte) (int, error) {
 	}
 	buf := make([]byte, len(p)-n)
 	nn, err := pt.file.Read(buf)
-	for i := 0; i < nn; i++ {
-		p[n+i] = buf[i]
-	}
+	copy(p[n:n+nn], buf[0:nn])
 	pt.pos.Pos = int64(nn)
 	return n + nn, err
 }
