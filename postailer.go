@@ -88,7 +88,7 @@ func (pt *Postailer) open() error {
 	if err != nil {
 		return err
 	}
-	if pt.pos.Pos < fi.Size() {
+	if pt.pos.Pos <= fi.Size() {
 		f.Seek(pt.pos.Pos, io.SeekStart)
 	} else {
 		pt.pos.Pos = 0

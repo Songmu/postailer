@@ -101,6 +101,29 @@ var readTests = []testReadTest{
 		NextPos: 4,
 	},
 	{
+		Name: "just EOF and reopen",
+		Prepare: func() (string, error) {
+			tmpd, err := ioutil.TempDir("", "")
+			if err != nil {
+				return "", err
+			}
+			fname, _ := fileAndPos(tmpd)
+			ioutil.WriteFile(fname, []byte("abcde"), 0644)
+			return tmpd, nil
+		},
+		Output1: []byte{'a', 'b', 'c', 'd', 'e'},
+		N1:      5,
+		Error1:  nil,
+		Hook: func(pt *Postailer) error {
+			pt.Close()
+			return pt.open()
+		},
+		Output2: []byte{0, 0, 0},
+		N2:      0,
+		Error2:  io.EOF,
+		NextPos: 5,
+	},
+	{
 		Name: "Roteted but missing",
 		Prepare: func() (string, error) {
 			tmpd, err := ioutil.TempDir("", "")
