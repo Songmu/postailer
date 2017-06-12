@@ -12,7 +12,7 @@ import (
 	"github.com/Songmu/postailer"
 )
 
-func ExampleRead() {
+func ExamplePostailer_Read() {
 	appendFile := func(fname, content string) error {
 		f, _ := os.OpenFile(fname, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		f.WriteString(content)
